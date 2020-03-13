@@ -6,25 +6,28 @@ class GitlabHookController < SysController
 
 
   def index
-    if request.post?
-      repository = find_repository
-      p repository.inspect
-      git_success = true
-      if repository
-        # Fetch the changes from GitLab
-        if Setting.plugin_redmine_gitlab_hook['fetch_updates'] == 'yes'
-          git_success = update_repository(repository)
-        end
-        if git_success
-          # Fetch the new changesets into Redmine
-          repository.fetch_changesets
-          render(:plain => 'OK', :status => :ok)
-        else
-          render(:plain => "Git command failed on repository: #{repository.identifier}!", :status => :not_acceptable)
-        end
-      end
-    else
+    raise ActionController::RoutingError.new('Not Found') unless request.post?
+    target_branch = get_target_branch
+    unless branches().include?(target_branch)
       raise ActionController::RoutingError.new('Not Found')
+    end
+
+    repository = find_repository(target_branch)
+    raise ActionController::RoutingError.new('Not Found') unless repository
+
+    # Fetch the changes from GitLab
+    if Setting.plugin_redmine_gitlab_hook['fetch_updates'] == 'yes'
+      git_success = update_repository(repository, target_branch)
+    else
+      git_success = truee
+    end
+
+    if git_success
+      # Fetch the new changesets into Redmine
+      repository.fetch_changesets
+      render(:plain => 'OK', :status => :ok)
+    else
+      render(:plain => "Git command failed on repository: #{repository.identifier}!", :status => :not_acceptable)
     end
   end
 
@@ -60,29 +63,26 @@ class GitlabHookController < SysController
 
 
   def git_command(prefix, command, repository)
-    "#{prefix} " + GIT_BIN + " --git-dir=\"#{repository.url}\" #{command}"
+    "#{prefix} #{GIT_BIN} --git-dir='#{repository.url}' #{command}"
   end
 
 
-  def clone_repository(prefix, remote_url, local_url)
-    "#{prefix} " + GIT_BIN + " clone --mirror #{remote_url} #{local_url}"
+  def clone_repository(prefix, remote_url, local_url, target_branch)
+    "#{prefix} #{GIT_BIN} clone --bare -b #{target_branch} --single-branch #{remote_url} #{local_url}"
   end
 
 
   # Fetches updates from the remote repository
-  def update_repository(repository)
+  def update_repository(repository, target_branch)
     Setting.plugin_redmine_gitlab_hook['prune'] == 'yes' ? prune = ' -p' : prune = ''
     prefix = Setting.plugin_redmine_gitlab_hook['git_command_prefix'].to_s
 
-    if Setting.plugin_redmine_gitlab_hook['all_branches'] == 'yes'
-      command = git_command(prefix, "fetch --all#{prune}", repository)
-      exec(command)
-    else
-      command = git_command(prefix, "fetch#{prune} origin", repository)
-      if exec(command)
-        command = git_command(prefix, "fetch#{prune} origin '+refs/heads/*:refs/heads/*'", repository)
-        exec(command)
-      end
+    branches = Setting.plugin_redmine_gitlab_hook['branches']
+    branches.include?(target_branch) or return
+    if exec(git_command(
+        prefix, "fetch#{prune} -f origin #{target_branch}:#{target_branch}",
+        repository))
+      exec(git_command(prefix, "git reset --soft FETCH_HEAD", repository))
     end
   end
 
@@ -94,6 +94,21 @@ class GitlabHookController < SysController
 
   def get_repository_namespace
     return params[:repository_namespace] && params[:repository_namespace].downcase
+  end
+
+
+  def branches
+    Setting.plugin_redmine_gitlab_hook['branches'].split(/[,\s]/)
+  end
+
+  def get_target_branch
+    evt = JSON.parse(request.body.string)
+    unless evt['object_kind'] == 'merge_request'
+      raise ActionController::RoutingError.new(
+        "object_kind #{evt['object_kind']} would not be handled.")
+    end
+
+    return evt['object_attributes']['target_branch']
   end
 
 
@@ -125,14 +140,14 @@ class GitlabHookController < SysController
 
 
   # Returns the Redmine Repository object we are trying to update
-  def find_repository
+  def find_repository(target_branch)
     project = find_project
     repository_id = get_repository_identifier
     repository = project.repositories.find_by_identifier_param(repository_id)
 
     if repository.nil?
       if Setting.plugin_redmine_gitlab_hook['auto_create'] == 'yes'
-        repository = create_repository(project)
+        repository = create_repository(project, target_branch)
       else
         raise TypeError, "Project '#{project.to_s}' ('#{project.identifier}') has no repository or repository not found with identifier '#{repository_id}'"
       end
@@ -146,7 +161,7 @@ class GitlabHookController < SysController
   end
 
 
-  def create_repository(project)
+  def create_repository(project, target_branch)
     logger.debug('Trying to create repository...')
     raise TypeError, 'Local repository path is not set' unless Setting.plugin_redmine_gitlab_hook['local_repositories_path'].to_s.present?
 
@@ -164,7 +179,7 @@ class GitlabHookController < SysController
 
     unless File.exists?(git_file)
       FileUtils.mkdir_p(local_url)
-      command = clone_repository(prefix, remote_url, local_url)
+      command = clone_repository(prefix, remote_url, local_url, target_branch)
       unless exec(command)
         raise RuntimeError, "Can't clone URL #{remote_url}"
       end

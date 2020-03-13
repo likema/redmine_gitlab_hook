@@ -1,9 +1,9 @@
 # German strings go here
 de:
   git_pull_type: Git pull Typ
-  all_branches:
-    label: Alle Branches
-    description: 'Diese Option holt alle Branches aus allen Remotes'
+  branches:
+    label: Branches
+    description: 'Diese Option holt Branches aus allen Remotes'
   prune:
     label: Prune
     description: 'Nach dem Abrufen, entfernt Prune alle Remote-Tracking-Referenzen, die nicht mehr auf dem Remotes vorhanden sind. Tags unterliegen nicht Prune, wenn sie nur durch Standard-Tag auto-following oder aufgrund einer --tags Option geholt wurden. Jedoch, werden Tags aufgrund einer expliziten Refspec abgerufen (entweder auf der Befehlszeile oder in der Remote-Konfiguration, beispielsweise wenn die Repository mit der --mirror Option geklont wurde), dann sind sie ebenfalls Prune ausgesetzt.'

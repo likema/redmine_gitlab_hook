@@ -1,9 +1,9 @@
 # English strings go here
 en:
   git_pull_type: Git pull type
-  all_branches:
-    label: All branches
-    description: 'This option fetches all branches from all remotes.'
+  branches:
+    label: Branches
+    description: 'This option fetches the specified branches from all remotes, which are separated by comma.'
   prune:
     label: Prune
     description: 'After fetching, prune removes any remote-tracking references that no longer exist on the remote. Tags are not subject to pruning if they are fetched only because of the default tag auto-following or due to a --tags option. However, if tags are fetched due to an explicit refspec (either on the command line or in the remote configuration, for example if the remote was cloned with the --mirror option), then they are also subject to pruning.'

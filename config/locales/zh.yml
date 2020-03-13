@@ -1,9 +1,9 @@
 # Simplified Chinese strings go here
 zh:
   git_pull_type: Git pull 类型
-  all_branches:
-    label: 全部分支
-    description: '该选项用于从远端存储库中获取所有分支的更新。'
+  branches:
+    label: 分支
+    description: '该选项用于从远端存储库中获取指定分支的更新, 以逗号分隔。'
   prune:
     label: Prune
     description: '获取更新后，剪除远端存储库上不再存在的任何远端跟踪引用。 如果仅在默认标记自动跟踪或使用了 --tags 选项导致获取，则标签不会被剪除。 但是，如果由于显式的refspec（在命令行或远端配置中，例如，如果远端存储库使用 --mirror 选项克隆了远端存储库文件），则获取标记也可以被剪除。'
